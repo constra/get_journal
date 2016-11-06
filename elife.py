@@ -1,36 +1,102 @@
+#!/usr/bin/env python2
+
+
 '''
 Created on 4 Aug 2016
 
 @author: sun
 '''
-import requests
-from bs4 import BeautifulSoup
 
-elife = "https://elifesciences.org"
-url = "https://elifesciences.org/archive/2016/08"
-r = requests.get(url) #hard copy of a url
-soup = BeautifulSoup(r.content, "lxml")
+import urllib.request
 
-Article_titles = soup.find_all("div", {"class": "ds-1col"})
+def eLifeRequest():    
+    url = 'https://elifesciences.org'
+    headers = {'UserAgent':'Mozilla/5.0'}
+    rqst = urllib.request.Request(url, headers=headers)
+    rsp = urllib.request.urlopen(rqst)
+    return(rsp)
 
-for i in Article_titles:
-    print "Title" *10
-    print i.contents[1].text # the title
-    print "Title" *10
-    a_u = elife + i.contents[1].find("a").get("href") #link
-    a_r = requests.get(a_u)
-    a_s = BeautifulSoup(a_r.content, "lxml")
+def eLifePageSource():
+    pagesource = eLifeRequest().read
+    return(pagesource)
+
+def eLifeSoup():
+    import bs4 as bs
     
-    abstract = a_s.find("div", {"id": "abstract"})
-    print "Abstract" *10
-    print abstract.contents[1].text # the abstract
-    print "Abstract" *10
+    eLifeRqst = eLifeRequest()
+    pagesource = eLifeRqst.read()
+    soup = bs.BeautifulSoup(pagesource, 'lxml')
+    return(soup)
+
+def eLifeGetSubjects():
+    soup = eLifeSoup()
     
-    try:
-        e_digest = a_s.find("div", {"id": "digest"})
-        print "Digest" * 10
-        print e_digest.contents[1].text # the eLife digest
-        print "Digest" * 10
-    except:
-        continue
+    subjects = {} ## dictionary with {'title':'links'}
+    sections = soup.find_all('section')
+    for section in sections:
+        if 'section-content' in section['class']:
+            ols = section.find_all('ol')
+            for ol in ols:
+                if 'home-subject-listing__list' in ol['class']:
+                    subjectSource = ol
+    
+    links = subjectSource.find_all('a')
+    for link in links:
+        subjects[str(link.text)] = link.get('href')
         
+    return(subjects)
+
+def eLifeGetCatagories():
+    soup = eLifeSoup()
+    
+    catagories = {} ## dictionary with {'title':'links'}
+    footer = soup.find_all('footer')[0]
+    ols = footer.find_all('ol')
+    for ol in ols:
+        try:
+            if 'site-footer__section_links' in ol['class']:
+                catagorySource = ol
+        
+        except:
+            pass
+
+    links = catagorySource.find_all('a')
+    for link in links:
+        catagories[str(link.text)] = link.get('href')
+         
+    return(catagories)
+
+    
+def eLifeLatest():
+    try:
+        soup = eLifeSoup()
+        
+        articles = {}
+        
+        sections = soup.find_all('section')
+        for section in sections:
+            if 'home-article-listing-wrapper' in section['class']:
+                divs = section.find_all('div')
+                for div in divs:
+                    if 'view-elife-latest-research' in div['class']:
+                        articleSource = div
+                
+                contentDict = {}
+                titleInfo = articleSource.find_all('h2')
+                #print(titleInfo)
+                for item in titleInfo:
+                    articles[str(item.text)] = item.a.get('href')
+                    
+        return(articles)
+                           
+    except Exception as e:
+        print(e)
+
+    
+    
+def main():
+    latest = eLifeLatest()
+    print(latest)
+    
+if __name__ == '__main__':
+    main()
