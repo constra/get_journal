@@ -8,9 +8,15 @@ Created on 4 Aug 2016
 '''
 
 import urllib.request
+from urllib.parse import urljoin
+import datetime
+import time
+import re
+
+url = 'https://elifesciences.org'
 
 def eLifeRequest():    
-    url = 'https://elifesciences.org'
+    global url
     headers = {'UserAgent':'Mozilla/5.0'}
     rqst = urllib.request.Request(url, headers=headers)
     rsp = urllib.request.urlopen(rqst)
@@ -70,33 +76,65 @@ def eLifeGetCatagories():
 def eLifeLatest():
     try:
         soup = eLifeSoup()
+            
+        articles = {} ## {'title':{title:title, authors: [authors], link: link, abstract: abstract, digest:digest}}
         
-        articles = {}
-        
-        sections = soup.find_all('section')
-        for section in sections:
-            if 'home-article-listing-wrapper' in section['class']:
-                divs = section.find_all('div')
-                for div in divs:
-                    if 'view-elife-latest-research' in div['class']:
-                        articleSource = div
-                
-                contentDict = {}
-                titleInfo = articleSource.find_all('h2')
-                #print(titleInfo)
-                for item in titleInfo:
-                    articles[str(item.text)] = item.a.get('href')
-                    
-        return(articles)
-                           
-    except Exception as e:
-        print(e)
+        articleSource = soup.find_all("div", { "class" : "home-article-listing__list-item" })
+    #     print(articleSourceAll)
+        for article in articleSource:
 
+            # Title
+            titleInfo = article.find_all('h2')
+            title = titleInfo[0].text
+
+            # Link
+            link = titleInfo[0].a.get('href')
+            link = urljoin(url, link)
     
-    
+            # Authors
+            authorInfo = article.find_all('li')
+            authors = [author.text for author in authorInfo]
+
+            # Impact statement
+            impactInfo = article.find_all('span')    
+            impact = impactInfo[0].text
+
+            # Update date
+            Date = article.find("time").attrs['datetime']
+            Date = time.strptime(Date, "%Y-%m-%d")
+
+            # Catagory
+            Catagory = article.find("a", {"class" : "article-teaser__category"}).text
+            
+            ## Subjects
+            SubjectInfo = article.find_all("a", {"class" : "article-teaser__heading"})
+            Subject = [sub.text for sub in SubjectInfo]
+            
+            ## Link to lens
+            LinkInfo = article.find("div", {"class" : "article-teaser__lens_link"})
+            lenslink = LinkInfo.a.get('href')
+
+            articles[title] = {"title" : title,
+                               "authors" : authors,
+                               "link" : link,
+                               "Date" : Date,
+                               "Impact" : impact,
+                               "Catagory" : Catagory,
+                               "Subject" : Subject,
+                               "Lens" : lenslink}
+
+        return articles
+
+    except Exception as e:
+        print(e,"Error")
+
+def test():
+    pass
+
 def main():
     latest = eLifeLatest()
     print(latest)
+     # eLifeLatest()
     
 if __name__ == '__main__':
     main()
